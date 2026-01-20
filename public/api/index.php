@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * Load configs
  * -------------------------------------------------
  */
-$configPath = __DIR__ . '/config.json'; // auth (host-based)
+$configPath = __DIR__ . '/config.json'; // host-based auth
 $envPath = __DIR__ . '/env.json';    // topology + entities
 
 if (!file_exists($configPath)) {
@@ -85,7 +85,7 @@ if (!$entity || !$id) {
 $entityMap = null;
 
 foreach ($env['entities'] as $e) {
-  if ($e['source']['entity_name'] === $entity) {
+  if ($e['target_entity_name'] === $entity) {
     $entityMap = $e;
     break;
   }
@@ -99,20 +99,22 @@ if (!$entityMap) {
 
 /**
  * -------------------------------------------------
- * Build TARGET (Airtable) URL
+ * Build TARGET URL (Airtable)
  * -------------------------------------------------
  */
-$target = $entityMap['target'];
+$targetBaseUrl = rtrim($env['target']['base_url'], '/');
+$targetBaseId = $env['target']['base_id'];
+$targetTable = $entityMap['target_entity_name'];
 
 $url =
-  rtrim($target['base_url'], '/') . '/' .
-  rawurlencode($target['base_id']) . '/' .
-  rawurlencode($target['entity_name']) . '/' .
+  $targetBaseUrl . '/' .
+  rawurlencode($targetBaseId) . '/' .
+  rawurlencode($targetTable) . '/' .
   rawurlencode($id);
 
 /**
  * -------------------------------------------------
- * Host-based auth injection (config.json)
+ * Host-based auth injection
  * -------------------------------------------------
  */
 $host = parse_url($url, PHP_URL_HOST);
@@ -137,7 +139,9 @@ if (isset($config[$host]['headers'])) {
  * -------------------------------------------------
  */
 $client = new CurlClient(false);
-$info = $client->get($url, $requestHeaders);
+$bodyStream = fopen('php://temp', 'w+');
+
+$info = $client->get($url, $requestHeaders, $bodyStream);
 
 if (!$info || ($info['http_code'] ?? 500) >= 400) {
   http_response_code(502);
@@ -148,20 +152,13 @@ if (!$info || ($info['http_code'] ?? 500) >= 400) {
   exit;
 }
 
-/**
- * -------------------------------------------------
- * TEMP BODY FETCH (CurlClient limitation)
- * -------------------------------------------------
- */
-$response = file_get_contents($url, false, stream_context_create([
-  'http' => [
-    'header' => implode("\r\n", $requestHeaders)
-  ]
-]));
+rewind($bodyStream);
+$data = json_decode(stream_get_contents($bodyStream), true);
+fclose($bodyStream);
 
 echo json_encode([
   'system' => 'target',
   'entity' => $entity,
   'id' => $id,
-  'data' => json_decode($response, true)
+  'data' => $data
 ], JSON_PRETTY_PRINT);

@@ -3,49 +3,44 @@
 
     <!-- Title -->
     <div class="text-h5 q-mb-md">
-      Connector — Target Fetch
+      My-Listing → Airtable Sync
     </div>
 
     <!-- Top row -->
     <div class="row q-col-gutter-md q-mb-md">
 
-      <!-- Source / Controls -->
+      <!-- Source (empty / later populated) -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
+            <div class="text-subtitle1 q-mb-sm">Source</div>
 
-            <div class="text-subtitle1 q-mb-sm">
-              Source
+            <div class="q-pa-sm" style="
+                background:#111;
+                color:#777;
+                border-radius:4px;
+                min-height:180px;
+                font-size:12px;
+              ">
+              —
             </div>
-
-            <q-select v-model="entity" :options="entities" option-label="label" option-value="value" label="Entity"
-              outlined dense class="q-mb-sm" />
-
-            <q-input v-model="recordId" label="Record ID" outlined dense class="q-mb-sm" />
-
-            <q-btn label="Fetch Target" color="primary" unelevated :loading="loading" @click="fetchTarget" />
-
           </q-card-section>
         </q-card>
       </div>
 
-      <!-- Target Raw -->
+      <!-- Target controls -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
 
-            <div class="text-subtitle1 q-mb-sm">
-              Target (Raw)
-            </div>
+            <div class="text-subtitle1 q-mb-sm">Target</div>
 
-            <pre class="q-pa-sm" style="
-                background:#111;
-                color:#0f0;
-                border-radius:4px;
-                max-height:250px;
-                overflow:auto;
-                font-size:12px;
-              ">{{ targetRaw }}</pre>
+            <q-select v-model="entity" :options="entities" option-label="label" option-value="value" emit-value
+              map-options label="Entity" outlined dense class="q-mb-sm" />
+
+            <q-input v-model="recordId" label="ID" outlined dense class="q-mb-sm" />
+
+            <q-btn label="Fetch" color="primary" unelevated :loading="loading" @click="fetchTarget" />
 
           </q-card-section>
         </q-card>
@@ -56,7 +51,24 @@
     <!-- Bottom row -->
     <div class="row q-col-gutter-md">
 
-      <!-- Source placeholder -->
+      <!-- Empty left (future diff / actions) -->
+      <div class="col-12 col-md-6">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="q-pa-sm" style="
+                background:#111;
+                color:#777;
+                border-radius:4px;
+                min-height:260px;
+                font-size:12px;
+              ">
+              —
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+
+      <!-- Source Record (raw JSON for now) -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
@@ -67,30 +79,9 @@
 
             <pre class="q-pa-sm" style="
                 background:#111;
-                color:#777;
-                border-radius:4px;
-                min-height:200px;
-                font-size:12px;
-              ">—</pre>
-
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- Target record -->
-      <div class="col-12 col-md-6">
-        <q-card flat bordered>
-          <q-card-section>
-
-            <div class="text-subtitle1 q-mb-sm">
-              Target Record
-            </div>
-
-            <pre class="q-pa-sm" style="
-                background:#111;
                 color:#0f0;
                 border-radius:4px;
-                min-height:200px;
+                min-height:260px;
                 overflow:auto;
                 font-size:12px;
               ">{{ targetRaw }}</pre>
@@ -106,7 +97,7 @@
 
 <script>
 export default {
-  name: 'ConnectorTargetFetch',
+  name: 'RevisionBridgeTargetFetch',
 
   data() {
     return {
@@ -124,21 +115,14 @@ export default {
 
   methods: {
     async loadConfigs() {
-      try {
-        const API = import.meta.env.VITE_CONNECTOR_BASE
-        const res = await fetch(
-          `${API}/index.php?endpoint=configs-fetch`
-        )
-        const json = await res.json()
+      const API = import.meta.env.VITE_CONNECTOR_BASE
+      const res = await fetch(`${API}/index.php?endpoint=configs-fetch`)
+      const json = await res.json()
 
-        this.entities = json.entities.map(e => ({
-          label: e.wp_entity_name,
-          value: e.wp_entity_name
-        }))
-
-      } catch (e) {
-        console.error('Failed to load configs', e)
-      }
+      this.entities = json.entities.map(e => ({
+        label: e.target_entity_name,
+        value: e.target_entity_name
+      }))
     },
 
     async fetchTarget() {
