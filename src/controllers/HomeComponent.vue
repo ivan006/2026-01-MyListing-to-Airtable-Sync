@@ -3,13 +3,13 @@
 
     <!-- Title -->
     <div class="text-h5 q-mb-md">
-      My-Listing → Airtable Sync
+      Connector — Target Fetch
     </div>
 
-    <!-- Top Panels -->
+    <!-- Top row -->
     <div class="row q-col-gutter-md q-mb-md">
 
-      <!-- Source -->
+      <!-- Source / Controls -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
@@ -18,110 +18,83 @@
               Source
             </div>
 
-            <q-select
-              v-model="entity"
-              :options="entities"
-              label="Entity"
-              outlined
-              dense
-              class="q-mb-sm"
-            />
+            <q-select v-model="entity" :options="entities" option-label="label" option-value="value" label="Entity"
+              outlined dense class="q-mb-sm" />
 
-            <q-input
-              v-model="recordId"
-              label="ID"
-              outlined
-              dense
-              class="q-mb-sm"
-            />
+            <q-input v-model="recordId" label="Record ID" outlined dense class="q-mb-sm" />
 
-            <q-btn
-              label="Fetch Target"
-              color="primary"
-              unelevated
-              :loading="loading"
-              @click="fetchTarget"
-            />
+            <q-btn label="Fetch Target" color="primary" unelevated :loading="loading" @click="fetchTarget" />
 
           </q-card-section>
         </q-card>
       </div>
 
-      <!-- Target -->
+      <!-- Target Raw -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
+
             <div class="text-subtitle1 q-mb-sm">
-              Target
+              Target (Raw)
             </div>
 
-            <pre
-              class="q-pa-sm"
-              style="
+            <pre class="q-pa-sm" style="
                 background:#111;
                 color:#0f0;
                 border-radius:4px;
-                max-height:200px;
+                max-height:250px;
                 overflow:auto;
                 font-size:12px;
-              "
-            >
-{{ targetRaw }}
-            </pre>
+              ">{{ targetRaw }}</pre>
+
           </q-card-section>
         </q-card>
       </div>
 
     </div>
 
-    <!-- Bottom Panels -->
+    <!-- Bottom row -->
     <div class="row q-col-gutter-md">
 
-      <!-- Source Record -->
+      <!-- Source placeholder -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
+
             <div class="text-subtitle1 q-mb-sm">
               Source Record
             </div>
 
-            <pre
-              class="q-pa-sm"
-              style="
+            <pre class="q-pa-sm" style="
                 background:#111;
-                color:#888;
+                color:#777;
                 border-radius:4px;
                 min-height:200px;
                 font-size:12px;
-              "
-            >
-—
-            </pre>
+              ">—</pre>
+
           </q-card-section>
         </q-card>
       </div>
 
-      <!-- Target Record -->
+      <!-- Target record -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
+
             <div class="text-subtitle1 q-mb-sm">
               Target Record
             </div>
 
-            <pre
-              class="q-pa-sm"
-              style="
+            <pre class="q-pa-sm" style="
                 background:#111;
                 color:#0f0;
                 border-radius:4px;
                 min-height:200px;
                 overflow:auto;
                 font-size:12px;
-              "
-            >
-{{ targetRaw }}
-            </pre>
+              ">{{ targetRaw }}</pre>
+
           </q-card-section>
         </q-card>
       </div>
@@ -133,25 +106,50 @@
 
 <script>
 export default {
-  data () {
+  name: 'ConnectorTargetFetch',
+
+  data() {
     return {
       entity: null,
       recordId: '',
-      entities: ['artworks'],
+      entities: [],
       loading: false,
       targetRaw: ''
     }
   },
 
-  methods: {
-    async fetchTarget () {
-      if (!this.entity || !this.recordId) return
+  async mounted() {
+    await this.loadConfigs()
+  },
 
-      this.loading = true
+  methods: {
+    async loadConfigs() {
       try {
         const API = import.meta.env.VITE_CONNECTOR_BASE
         const res = await fetch(
-          `${API}/index.php?endpoint=target-fetch&entity=${this.entity}&id=${this.recordId}`
+          `${API}/index.php?endpoint=configs-fetch`
+        )
+        const json = await res.json()
+
+        this.entities = json.entities.map(e => ({
+          label: `${e.wp_entity_name} ↔ ${e.airtable_entity_name}`,
+          value: e.wp_entity_name
+        }))
+      } catch (e) {
+        console.error('Failed to load configs', e)
+      }
+    },
+
+    async fetchTarget() {
+      if (!this.entity || !this.recordId) return
+
+      this.loading = true
+      this.targetRaw = ''
+
+      try {
+        const API = import.meta.env.VITE_CONNECTOR_BASE
+        const res = await fetch(
+          `${API}/index.php?endpoint=target-fetch&entity=${encodeURIComponent(this.entity)}&id=${encodeURIComponent(this.recordId)}`
         )
         const json = await res.json()
         this.targetRaw = JSON.stringify(json, null, 2)

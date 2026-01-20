@@ -5,7 +5,7 @@
     <q-header elevated>
       <q-toolbar>
         <q-toolbar-title>
-          Cache Manager
+          Revision Gateway
         </q-toolbar-title>
         <q-btn flat @click="drawerLeft = !drawerLeft" round dense icon="menu" />
       </q-toolbar>
@@ -15,23 +15,12 @@
         v-model="drawerLeft">
       <q-list padding>
 
-        <q-item clickable to="/data-cache-info">
+        <q-item clickable to="/">
           <q-item-section>
-            Data Cache (How It Works)
+            Home
           </q-item-section>
         </q-item>
 
-        <q-item clickable to="/data-cache-binder">
-          <q-item-section>
-            Data Cache (Page Binder)
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/html-cache-pages">
-          <q-item-section>
-            HTML Cache (Page List)
-          </q-item-section>
-        </q-item>
 
       </q-list>
     </q-drawer>

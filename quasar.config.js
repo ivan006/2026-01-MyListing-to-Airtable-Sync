@@ -19,7 +19,7 @@ export default configure(function () {
       },
       // vueRouterMode: "hash",
       vueRouterMode: "history",
-      publicPath: "cacher",
+      publicPath: "revision",
       minify: "esbuild",
       esbuild: {
         target: "esnext",
