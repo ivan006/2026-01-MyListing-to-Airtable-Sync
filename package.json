@@ -1,0 +1,54 @@
+{
+  "name": "quasar-project",
+  "version": "0.0.1",
+  "description": "",
+  "productName": "Quasar",
+  "author": "Ivan Copeland <ivan.copeland2015@gmail.com>",
+  "private": true,
+  "scripts": {
+    "lint": "eslint --ext .js,.vue ./",
+    "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore",
+    "test": "echo \"No test specified\" && exit 0",
+    "dev": "cross-env NODE_ENV=development quasar dev",
+    "build": "cross-env NODE_ENV=production quasar build",
+    "build:alert": "node build-and-alert.js",
+    "watch:build": "chokidar \"src/**/*\" -c \"npm run build:alert\""
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.4",
+    "@quasar/quasar-ui-qcalendar": "^4.0.0-beta.16",
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@vuex-orm/core": "^0.36.4",
+    "@vuex-orm/plugin-axios": "^0.9.4",
+    "axios": "^1.7.2",
+    "dayjs": "^1.11.13",
+    "object-to-formdata": "^4.5.1",
+    "quasar": "^2.16.0",
+    "vue": "^3.4.18",
+    "vue-cookies": "^1.8.4",
+    "vue-router": "^4.0.12",
+    "vue3-google-map": "^0.21.0",
+    "vuex": "^4.1.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.6",
+    "@babel/eslint-parser": "^7.24.6",
+    "@babel/preset-env": "^7.24.6",
+    "@quasar/app-vite": "^2.0.0-beta.1",
+    "autoprefixer": "^10.4.2",
+    "chokidar-cli": "^3.0.0",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-plugin-vue": "^9.26.0",
+    "node-notifier": "^10.0.1",
+    "postcss": "^8.4.14",
+    "prettier": "^2.5.1",
+    "vite-plugin-checker": "^0.6.4"
+  },
+  "engines": {
+    "node": "^20 || ^18 || ^16",
+    "npm": ">= 6.13.4",
+    "yarn": ">= 1.21.1"
+  }
+}

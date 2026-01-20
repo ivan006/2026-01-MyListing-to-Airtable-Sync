@@ -1,0 +1,20 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force HTTPS
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    RewriteBase /cacher/
+
+    # Allow real files and folders
+    RewriteRule ^(data-cache|html-cache)(/.*)?$ - [L]
+    RewriteRule ^assets(/.*)?$ - [L]
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule . - [L]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule . - [L]
+
+    # Everything else → Vue SPA
+    RewriteRule . index.html [L]
+</IfModule>
