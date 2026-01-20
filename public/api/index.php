@@ -16,48 +16,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 /**
- * -------------------------------------------------
- * Load config.json (host-based headers)
- * -------------------------------------------------
+ * -----------------------------
+ * Load configs
+ * -----------------------------
  */
 $configPath = __DIR__ . '/config.json';
+$mappingPath = __DIR__ . '/mapping-config.json';
+
 if (!file_exists($configPath)) {
   http_response_code(500);
   echo json_encode(['error' => 'Missing config.json']);
   exit;
 }
+if (!file_exists($mappingPath)) {
+  http_response_code(500);
+  echo json_encode(['error' => 'Missing mapping-config.json']);
+  exit;
+}
 
 $config = json_decode(file_get_contents($configPath), true);
+$mapping = json_decode(file_get_contents($mappingPath), true);
 
 /**
- * -------------------------------------------------
+ * -----------------------------
  * Routing
- * -------------------------------------------------
+ * -----------------------------
  */
 $endpoint = $_GET['endpoint'] ?? null;
 
 /**
- * -------------------------------------------------
- * CONFIGS FETCH (frontend discovery only)
- * -------------------------------------------------
+ * -----------------------------
+ * CONFIGS FETCH (frontend)
+ * -----------------------------
  */
 if ($endpoint === 'configs-fetch') {
-  $mappingPath = __DIR__ . '/mapping-config.json';
-
-  if (!file_exists($mappingPath)) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Missing mapping-config.json']);
-    exit;
-  }
-
-  echo file_get_contents($mappingPath);
+  echo json_encode($mapping, JSON_PRETTY_PRINT);
   exit;
 }
 
 /**
- * -------------------------------------------------
+ * -----------------------------
  * TARGET FETCH
- * -------------------------------------------------
+ * -----------------------------
  */
 if ($endpoint !== 'target-fetch') {
   http_response_code(404);
@@ -75,14 +75,33 @@ if (!$entity || !$id) {
 }
 
 /**
- * -------------------------------------------------
- * Build Airtable URL (hard-coded target for now)
- * Later this comes from mapping-config / config
- * -------------------------------------------------
+ * -----------------------------
+ * Validate entity via mapping-config
+ * -----------------------------
+ */
+$entityMap = null;
+
+foreach ($mapping['entities'] as $e) {
+  if ($e['wp_entity_name'] === $entity) {
+    $entityMap = $e;
+    break;
+  }
+}
+
+if (!$entityMap) {
+  http_response_code(404);
+  echo json_encode(['error' => 'Entity not allowed by mapping-config']);
+  exit;
+}
+
+/**
+ * -----------------------------
+ * Build Airtable URL (target)
+ * -----------------------------
  */
 $baseUrl = 'https://api.airtable.com/v0';
-$baseId = 'BASE_ID_HERE';
-$table = $entity;
+$baseId = 'BASE_ID_HERE'; // later move to config if needed
+$table = $entityMap['airtable_entity_name'];
 
 $url = $baseUrl . '/'
   . rawurlencode($baseId) . '/'
@@ -90,9 +109,9 @@ $url = $baseUrl . '/'
   . rawurlencode($id);
 
 /**
- * -------------------------------------------------
- * Host-based auth injection (YOUR MODEL)
- * -------------------------------------------------
+ * -----------------------------
+ * Host-based auth injection
+ * -----------------------------
  */
 $host = parse_url($url, PHP_URL_HOST);
 
@@ -103,7 +122,6 @@ if (!isset($config[$host])) {
 }
 
 $requestHeaders = [];
-
 if (isset($config[$host]['headers'])) {
   foreach ($config[$host]['headers'] as $key => $value) {
     $requestHeaders[] = $key . ': ' . $value;
@@ -111,9 +129,9 @@ if (isset($config[$host]['headers'])) {
 }
 
 /**
- * -------------------------------------------------
+ * -----------------------------
  * Fetch
- * -------------------------------------------------
+ * -----------------------------
  */
 $client = new CurlClient(false);
 $info = $client->get($url, $requestHeaders);
@@ -128,9 +146,9 @@ if (!$info || ($info['http_code'] ?? 500) >= 400) {
 }
 
 /**
- * -------------------------------------------------
- * TEMP BODY FETCH (CurlClient limitation)
- * -------------------------------------------------
+ * -----------------------------
+ * Temp body fetch (CurlClient limitation)
+ * -----------------------------
  */
 $response = file_get_contents($url, false, stream_context_create([
   'http' => [
