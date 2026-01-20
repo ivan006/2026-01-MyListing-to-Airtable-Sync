@@ -132,9 +132,10 @@ export default {
         const json = await res.json()
 
         this.entities = json.entities.map(e => ({
-          label: `${e.wp_entity_name} ↔ ${e.airtable_entity_name}`,
+          label: e.wp_entity_name,
           value: e.wp_entity_name
         }))
+
       } catch (e) {
         console.error('Failed to load configs', e)
       }

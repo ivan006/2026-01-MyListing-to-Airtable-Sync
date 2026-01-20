@@ -16,48 +16,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 /**
- * -----------------------------
+ * -------------------------------------------------
  * Load configs
- * -----------------------------
+ * -------------------------------------------------
  */
-$configPath = __DIR__ . '/config.json';
-$mappingPath = __DIR__ . '/mapping-config.json';
+$configPath = __DIR__ . '/config.json'; // auth (host-based)
+$envPath = __DIR__ . '/env.json';    // topology + entities
 
 if (!file_exists($configPath)) {
   http_response_code(500);
   echo json_encode(['error' => 'Missing config.json']);
   exit;
 }
-if (!file_exists($mappingPath)) {
+
+if (!file_exists($envPath)) {
   http_response_code(500);
-  echo json_encode(['error' => 'Missing mapping-config.json']);
+  echo json_encode(['error' => 'Missing env.json']);
   exit;
 }
 
 $config = json_decode(file_get_contents($configPath), true);
-$mapping = json_decode(file_get_contents($mappingPath), true);
+$env = json_decode(file_get_contents($envPath), true);
 
 /**
- * -----------------------------
+ * -------------------------------------------------
  * Routing
- * -----------------------------
+ * -------------------------------------------------
  */
 $endpoint = $_GET['endpoint'] ?? null;
 
 /**
- * -----------------------------
- * CONFIGS FETCH (frontend)
- * -----------------------------
+ * -------------------------------------------------
+ * CONFIGS FETCH (frontend discovery)
+ * -------------------------------------------------
  */
 if ($endpoint === 'configs-fetch') {
-  echo json_encode($mapping, JSON_PRETTY_PRINT);
+  echo json_encode([
+    'entities' => $env['entities'] ?? []
+  ], JSON_PRETTY_PRINT);
   exit;
 }
 
 /**
- * -----------------------------
+ * -------------------------------------------------
  * TARGET FETCH
- * -----------------------------
+ * -------------------------------------------------
  */
 if ($endpoint !== 'target-fetch') {
   http_response_code(404);
@@ -75,14 +78,14 @@ if (!$entity || !$id) {
 }
 
 /**
- * -----------------------------
- * Validate entity via mapping-config
- * -----------------------------
+ * -------------------------------------------------
+ * Validate entity via env.json
+ * -------------------------------------------------
  */
 $entityMap = null;
 
-foreach ($mapping['entities'] as $e) {
-  if ($e['wp_entity_name'] === $entity) {
+foreach ($env['entities'] as $e) {
+  if ($e['source']['entity_name'] === $entity) {
     $entityMap = $e;
     break;
   }
@@ -90,38 +93,38 @@ foreach ($mapping['entities'] as $e) {
 
 if (!$entityMap) {
   http_response_code(404);
-  echo json_encode(['error' => 'Entity not allowed by mapping-config']);
+  echo json_encode(['error' => 'Entity not allowed']);
   exit;
 }
 
 /**
- * -----------------------------
- * Build Airtable URL (target)
- * -----------------------------
+ * -------------------------------------------------
+ * Build TARGET (Airtable) URL
+ * -------------------------------------------------
  */
-$baseUrl = 'https://api.airtable.com/v0';
-$baseId = 'BASE_ID_HERE'; // later move to config if needed
-$table = $entityMap['airtable_entity_name'];
+$target = $entityMap['target'];
 
-$url = $baseUrl . '/'
-  . rawurlencode($baseId) . '/'
-  . rawurlencode($table) . '/'
-  . rawurlencode($id);
+$url =
+  rtrim($target['base_url'], '/') . '/' .
+  rawurlencode($target['base_id']) . '/' .
+  rawurlencode($target['entity_name']) . '/' .
+  rawurlencode($id);
 
 /**
- * -----------------------------
- * Host-based auth injection
- * -----------------------------
+ * -------------------------------------------------
+ * Host-based auth injection (config.json)
+ * -------------------------------------------------
  */
 $host = parse_url($url, PHP_URL_HOST);
 
 if (!isset($config[$host])) {
   http_response_code(500);
-  echo json_encode(['error' => 'No config for host: ' . $host]);
+  echo json_encode(['error' => 'No auth config for host: ' . $host]);
   exit;
 }
 
 $requestHeaders = [];
+
 if (isset($config[$host]['headers'])) {
   foreach ($config[$host]['headers'] as $key => $value) {
     $requestHeaders[] = $key . ': ' . $value;
@@ -129,9 +132,9 @@ if (isset($config[$host]['headers'])) {
 }
 
 /**
- * -----------------------------
+ * -------------------------------------------------
  * Fetch
- * -----------------------------
+ * -------------------------------------------------
  */
 $client = new CurlClient(false);
 $info = $client->get($url, $requestHeaders);
@@ -146,9 +149,9 @@ if (!$info || ($info['http_code'] ?? 500) >= 400) {
 }
 
 /**
- * -----------------------------
- * Temp body fetch (CurlClient limitation)
- * -----------------------------
+ * -------------------------------------------------
+ * TEMP BODY FETCH (CurlClient limitation)
+ * -------------------------------------------------
  */
 $response = file_get_contents($url, false, stream_context_create([
   'http' => [
