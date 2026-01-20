@@ -1,0 +1,12 @@
+{
+  "entities": [
+    {
+      "airtable_entity_name": "Artworks",
+      "wp_entity_name": "artwork"
+    },
+    {
+      "airtable_entity_name": "Artists",
+      "wp_entity_name": "artist"
+    }
+  ]
+}
