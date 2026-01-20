@@ -4,7 +4,6 @@ ini_set('display_errors', true);
 error_reporting(E_ALL);
 
 require __DIR__ . '/CurlClient.php';
-require __DIR__ . '/OAuthClient.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -16,6 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
   exit;
 }
 
+/**
+ * -------------------------------------------------
+ * Load config.json (host-based headers)
+ * -------------------------------------------------
+ */
 $configPath = __DIR__ . '/config.json';
 if (!file_exists($configPath)) {
   http_response_code(500);
@@ -25,15 +29,44 @@ if (!file_exists($configPath)) {
 
 $config = json_decode(file_get_contents($configPath), true);
 
+/**
+ * -------------------------------------------------
+ * Routing
+ * -------------------------------------------------
+ */
 $endpoint = $_GET['endpoint'] ?? null;
-$entity = $_GET['entity'] ?? null;
-$id = $_GET['id'] ?? null;
 
-if ($endpoint !== 'target-fetch') {
-  http_response_code(404);
-  echo json_encode(['error' => 'Only target-fetch is supported']);
+/**
+ * -------------------------------------------------
+ * CONFIGS FETCH (frontend discovery only)
+ * -------------------------------------------------
+ */
+if ($endpoint === 'configs-fetch') {
+  $mappingPath = __DIR__ . '/mapping-config.json';
+
+  if (!file_exists($mappingPath)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Missing mapping-config.json']);
+    exit;
+  }
+
+  echo file_get_contents($mappingPath);
   exit;
 }
+
+/**
+ * -------------------------------------------------
+ * TARGET FETCH
+ * -------------------------------------------------
+ */
+if ($endpoint !== 'target-fetch') {
+  http_response_code(404);
+  echo json_encode(['error' => 'Unknown endpoint']);
+  exit;
+}
+
+$entity = $_GET['entity'] ?? null;
+$id = $_GET['id'] ?? null;
 
 if (!$entity || !$id) {
   http_response_code(400);
@@ -41,31 +74,49 @@ if (!$entity || !$id) {
   exit;
 }
 
-if (
-  !isset($config['entities'][$entity]) ||
-  !isset($config['entities'][$entity]['target'])
-) {
-  http_response_code(404);
-  echo json_encode(['error' => 'Unknown target entity']);
+/**
+ * -------------------------------------------------
+ * Build Airtable URL (hard-coded target for now)
+ * Later this comes from mapping-config / config
+ * -------------------------------------------------
+ */
+$baseUrl = 'https://api.airtable.com/v0';
+$baseId = 'BASE_ID_HERE';
+$table = $entity;
+
+$url = $baseUrl . '/'
+  . rawurlencode($baseId) . '/'
+  . rawurlencode($table) . '/'
+  . rawurlencode($id);
+
+/**
+ * -------------------------------------------------
+ * Host-based auth injection (YOUR MODEL)
+ * -------------------------------------------------
+ */
+$host = parse_url($url, PHP_URL_HOST);
+
+if (!isset($config[$host])) {
+  http_response_code(500);
+  echo json_encode(['error' => 'No config for host: ' . $host]);
   exit;
 }
 
-$target = $config['entities'][$entity]['target'];
-$system = $config['systems'][$target['system']];
+$requestHeaders = [];
 
-$url =
-  rtrim($system['base_url'], '/') . '/' .
-  $target['base_id'] . '/' .
-  rawurlencode($target['table']) . '/' .
-  rawurlencode($id);
+if (isset($config[$host]['headers'])) {
+  foreach ($config[$host]['headers'] as $key => $value) {
+    $requestHeaders[] = $key . ': ' . $value;
+  }
+}
 
-$client = new OAuthClient(false);
-
-$headers = [
-  'Authorization: Bearer ' . $system['access_token']
-];
-
-$info = $client->get($url, $headers);
+/**
+ * -------------------------------------------------
+ * Fetch
+ * -------------------------------------------------
+ */
+$client = new CurlClient(false);
+$info = $client->get($url, $requestHeaders);
 
 if (!$info || ($info['http_code'] ?? 500) >= 400) {
   http_response_code(502);
@@ -77,13 +128,13 @@ if (!$info || ($info['http_code'] ?? 500) >= 400) {
 }
 
 /**
- * IMPORTANT:
- * CurlClient currently writes body to temp file and does not return it.
- * For now, re-fetch body directly.
+ * -------------------------------------------------
+ * TEMP BODY FETCH (CurlClient limitation)
+ * -------------------------------------------------
  */
 $response = file_get_contents($url, false, stream_context_create([
   'http' => [
-    'header' => implode("\r\n", $headers)
+    'header' => implode("\r\n", $requestHeaders)
   ]
 ]));
 
