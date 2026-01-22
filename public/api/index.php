@@ -20,8 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * Load configs
  * -------------------------------------------------
  */
-$configPath = __DIR__ . '/config.json'; // host-based auth
-$envPath = __DIR__ . '/env.json';    // topology + entities
+$configPath = __DIR__ . '/config.json';
+$envPath = __DIR__ . '/env.json';
 
 if (!file_exists($configPath)) {
   http_response_code(500);
@@ -47,7 +47,7 @@ $endpoint = $_GET['endpoint'] ?? null;
 
 /**
  * -------------------------------------------------
- * CONFIGS FETCH (frontend discovery)
+ * CONFIGS FETCH
  * -------------------------------------------------
  */
 if ($endpoint === 'configs-fetch') {
@@ -59,106 +59,93 @@ if ($endpoint === 'configs-fetch') {
 
 /**
  * -------------------------------------------------
- * TARGET FETCH
+ * TARGET FETCH (Airtable)
  * -------------------------------------------------
- */
-if ($endpoint !== 'target-fetch') {
-  http_response_code(404);
-  echo json_encode(['error' => 'Unknown endpoint']);
-  exit;
-}
+ */ elseif ($endpoint === 'target-fetch') {
 
-$entity = $_GET['entity'] ?? null;
-$id = $_GET['id'] ?? null;
+  $entity = $_GET['entity'] ?? null;
+  $id = $_GET['id'] ?? null;
 
-if (!$entity || !$id) {
-  http_response_code(400);
-  echo json_encode(['error' => 'Missing entity or id']);
-  exit;
-}
-
-/**
- * -------------------------------------------------
- * Validate entity via env.json
- * -------------------------------------------------
- */
-$entityMap = null;
-
-foreach ($env['entities'] as $e) {
-  if ($e['target_entity_name'] === $entity) {
-    $entityMap = $e;
-    break;
+  if (!$entity || !$id) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Missing entity or id']);
+    exit;
   }
-}
 
-if (!$entityMap) {
-  http_response_code(404);
-  echo json_encode(['error' => 'Entity not allowed']);
-  exit;
-}
-
-/**
- * -------------------------------------------------
- * Build TARGET URL (Airtable)
- * -------------------------------------------------
- */
-$targetBaseUrl = rtrim($env['target']['base_url'], '/');
-$targetBaseId = $env['target']['base_id'];
-$targetTable = $entityMap['target_entity_name'];
-
-$url =
-  $targetBaseUrl . '/' .
-  rawurlencode($targetBaseId) . '/' .
-  rawurlencode($targetTable) . '/' .
-  rawurlencode($id);
-
-/**
- * -------------------------------------------------
- * Host-based auth injection
- * -------------------------------------------------
- */
-$host = parse_url($url, PHP_URL_HOST);
-
-if (!isset($config[$host])) {
-  http_response_code(500);
-  echo json_encode(['error' => 'No auth config for host: ' . $host]);
-  exit;
-}
-
-$requestHeaders = [];
-
-if (isset($config[$host]['headers'])) {
-  foreach ($config[$host]['headers'] as $key => $value) {
-    $requestHeaders[] = $key . ': ' . $value;
+  // Validate target entity
+  $entityMap = null;
+  foreach ($env['entities'] as $e) {
+    if (($e['target_entity_name'] ?? null) === $entity) {
+      $entityMap = $e;
+      break;
+    }
   }
-}
 
-/**
- * -------------------------------------------------
- * Fetch
- * -------------------------------------------------
- */
-$client = new CurlClient(false);
-$bodyStream = fopen('php://temp', 'w+');
+  if (!$entityMap) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Entity not allowed']);
+    exit;
+  }
 
-$info = $client->get($url, $requestHeaders, $bodyStream);
+  $targetBaseUrl = rtrim($env['target']['base_url'], '/');
+  $targetBaseId = $env['target']['base_id'];
+  $targetTable = $entityMap['target_entity_name'];
 
-if (!$info || ($info['http_code'] ?? 500) >= 400) {
-  http_response_code(502);
+  $url =
+    $targetBaseUrl . '/' .
+    rawurlencode($targetBaseId) . '/' .
+    rawurlencode($targetTable) . '/' .
+    rawurlencode($id);
+
+  // Host-based auth
+  $host = parse_url($url, PHP_URL_HOST);
+
+  if (!isset($config[$host])) {
+    http_response_code(500);
+    echo json_encode(['error' => 'No auth config for host: ' . $host]);
+    exit;
+  }
+
+  $requestHeaders = [];
+  if (isset($config[$host]['headers'])) {
+    foreach ($config[$host]['headers'] as $k => $v) {
+      $requestHeaders[] = $k . ': ' . $v;
+    }
+  }
+
+  $client = new CurlClient(false);
+  $bodyStream = fopen('php://temp', 'w+');
+
+  $info = $client->get($url, $requestHeaders, $bodyStream);
+
+  if (!$info || ($info['http_code'] ?? 500) >= 400) {
+    http_response_code(502);
+    echo json_encode([
+      'error' => 'Failed to fetch target record',
+      'http_code' => $info['http_code'] ?? null
+    ], JSON_PRETTY_PRINT);
+    exit;
+  }
+
+  rewind($bodyStream);
+  $data = json_decode(stream_get_contents($bodyStream), true);
+  fclose($bodyStream);
+
   echo json_encode([
-    'error' => 'Failed to fetch target record',
-    'http_code' => $info['http_code'] ?? null
+    'system' => 'target',
+    'entity' => $entity,
+    'id' => $id,
+    'data' => $data
   ], JSON_PRETTY_PRINT);
   exit;
 }
 
-rewind($bodyStream);
-$data = json_decode(stream_get_contents($bodyStream), true);
-fclose($bodyStream);
-
-echo json_encode([
-  'system' => 'target',
-  'entity' => $entity,
-  'id' => $id,
-  'data' => $data
-], JSON_PRETTY_PRINT);
+/**
+ * -------------------------------------------------
+ * FALLBACK
+ * -------------------------------------------------
+ */ else {
+  http_response_code(404);
+  echo json_encode(['error' => 'Unknown endpoint']);
+  exit;
+}
