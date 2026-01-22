@@ -5,38 +5,39 @@
       My-Listing → Airtable Sync
     </div>
 
-    <!-- Top row -->
     <div class="row q-col-gutter-md q-mb-md">
 
-      <!-- Source (placeholder for now) -->
+      <!-- SOURCE -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
+
             <div class="text-subtitle1 q-mb-sm">Source</div>
 
-            <pre class="q-pa-sm" style="background:#111;color:#777;border-radius:4px;min-height:180px;font-size:12px;">
-{{ record.source.data
-  ? JSON.stringify(record.source.data, null, 2)
-  : '—' }}
-            </pre>
+            <q-select v-model="source.entity" :options="sourceEntities" emit-value map-options label="Source Entity"
+              outlined dense class="q-mb-sm" />
+
+            <q-input v-model="source.id" label="Source ID" outlined dense class="q-mb-sm" />
+
+            <q-btn label="Fetch Source" color="secondary" unelevated :loading="source.loading" @click="fetchSource" />
+
           </q-card-section>
         </q-card>
       </div>
 
-      <!-- Target controls -->
+      <!-- TARGET -->
       <div class="col-12 col-md-6">
         <q-card flat bordered>
           <q-card-section>
 
             <div class="text-subtitle1 q-mb-sm">Target</div>
 
-            <q-select v-model="entity" :options="entities" option-label="label" option-value="value" emit-value
-              map-options label="Entity" outlined dense class="q-mb-sm" />
+            <q-select v-model="target.entity" :options="targetEntities" emit-value map-options label="Target Entity"
+              outlined dense class="q-mb-sm" />
 
-            <q-input v-model="recordId" label="ID" outlined dense class="q-mb-sm" />
+            <q-input v-model="target.id" label="Target ID" outlined dense class="q-mb-sm" />
 
-            <q-btn label="Fetch Target" color="primary" unelevated :loading="record.target.loading"
-              @click="fetchTarget" />
+            <q-btn label="Fetch Target" color="primary" unelevated :loading="target.loading" @click="fetchTarget" />
 
           </q-card-section>
         </q-card>
@@ -44,40 +45,15 @@
 
     </div>
 
-    <!-- Bottom row -->
+    <!-- DEBUG OUTPUT -->
     <div class="row q-col-gutter-md">
-
-      <!-- Future diff / actions -->
       <div class="col-12 col-md-6">
-        <q-card flat bordered>
-          <q-card-section>
-            <pre class="q-pa-sm" style="background:#111;color:#777;border-radius:4px;min-height:260px;font-size:12px;">
-—
-            </pre>
-          </q-card-section>
-        </q-card>
+        <pre v-if="source.data">{{ source.data }}</pre>
+        
       </div>
-
-      <!-- Target Record -->
       <div class="col-12 col-md-6">
-        <q-card flat bordered>
-          <q-card-section>
-
-            <div class="text-subtitle1 q-mb-sm">
-              Target Record
-            </div>
-
-            <pre class="q-pa-sm"
-              style="background:#111;color:#0f0;border-radius:4px;min-height:260px;overflow:auto;font-size:12px;">
-{{ record.target.data
-  ? JSON.stringify(record.target.data, null, 2)
-  : '—' }}
-            </pre>
-
-          </q-card-section>
-        </q-card>
+        <pre v-if="target.data">{{ target.data }}</pre>
       </div>
-
     </div>
 
   </q-page>
@@ -89,22 +65,20 @@ export default {
 
   data() {
     return {
-      entity: null,
-      recordId: '',
-      entities: [],
-
-      record: {
-        source: {
-          data: null,
-          loading: false,
-          error: null
-        },
-        target: {
-          data: null,
-          loading: false,
-          error: null
-        }
-      }
+      source: {
+        entity: null,
+        id: '',
+        data: null,
+        loading: false
+      },
+      target: {
+        entity: null,
+        id: '',
+        data: null,
+        loading: false
+      },
+      sourceEntities: [],
+      targetEntities: []
     }
   },
 
@@ -118,31 +92,37 @@ export default {
       const res = await fetch(`${API}/index.php?endpoint=configs-fetch`)
       const json = await res.json()
 
-      this.entities = json.entities.map(e => ({
-        label: e.target_entity_name,
-        value: e.target_entity_name
-      }))
+      this.sourceEntities = [...new Set(
+        json.entities.map(e => e.source_entity_name)
+      )].map(v => ({ label: v, value: v }))
+
+      this.targetEntities = [...new Set(
+        json.entities.map(e => e.target_entity_name)
+      )].map(v => ({ label: v, value: v }))
+    },
+
+    async fetchSource() {
+      if (!this.source.entity || !this.source.id) return
+      this.source.loading = true
+
+      const API = import.meta.env.VITE_CONNECTOR_BASE
+      const res = await fetch(
+        `${API}/index.php?endpoint=source-fetch&entity=${encodeURIComponent(this.source.entity)}&id=${encodeURIComponent(this.source.id)}`
+      )
+      this.source.data = await res.json()
+      this.source.loading = false
     },
 
     async fetchTarget() {
-      if (!this.entity || !this.recordId) return
+      if (!this.target.entity || !this.target.id) return
+      this.target.loading = true
 
-      this.record.target.loading = true
-      this.record.target.error = null
-      this.record.target.data = null
-
-      try {
-        const API = import.meta.env.VITE_CONNECTOR_BASE
-        const res = await fetch(
-          `${API}/index.php?endpoint=target-fetch&entity=${encodeURIComponent(this.entity)}&id=${encodeURIComponent(this.recordId)}`
-        )
-        const json = await res.json()
-        this.record.target.data = json
-      } catch (e) {
-        this.record.target.error = e.message
-      } finally {
-        this.record.target.loading = false
-      }
+      const API = import.meta.env.VITE_CONNECTOR_BASE
+      const res = await fetch(
+        `${API}/index.php?endpoint=target-fetch&entity=${encodeURIComponent(this.target.entity)}&id=${encodeURIComponent(this.target.id)}`
+      )
+      this.target.data = await res.json()
+      this.target.loading = false
     }
   }
 }
