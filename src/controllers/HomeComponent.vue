@@ -48,11 +48,41 @@
     <!-- DEBUG OUTPUT -->
     <div class="row q-col-gutter-md">
       <div class="col-12 col-md-6">
-        <pre v-if="source.data">{{ source.data }}</pre>
-        
+
+
+        <q-card flat bordered>
+          <q-card-section>
+
+            <div class="text-subtitle1 q-mb-sm">
+              Source Record
+            </div>
+
+            <pre class="q-pa-sm"
+              style="background:#111;color:#0f0;border-radius:4px;min-height:260px;overflow:auto;font-size:12px;">
+{{ source.data }}
+            </pre>
+
+          </q-card-section>
+        </q-card>
+
       </div>
       <div class="col-12 col-md-6">
-        <pre v-if="target.data">{{ target.data }}</pre>
+
+
+        <q-card flat bordered>
+          <q-card-section>
+
+            <div class="text-subtitle1 q-mb-sm">
+              Target Record
+            </div>
+
+            <pre class="q-pa-sm"
+              style="background:#111;color:#0f0;border-radius:4px;min-height:260px;overflow:auto;font-size:12px;">
+{{ target.data }}
+            </pre>
+
+          </q-card-section>
+        </q-card>
       </div>
     </div>
 
