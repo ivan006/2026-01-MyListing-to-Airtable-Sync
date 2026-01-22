@@ -59,6 +59,66 @@ if ($endpoint === 'configs-fetch') {
 
 /**
  * -------------------------------------------------
+ * SOURCE FETCH (WordPress)
+ * -------------------------------------------------
+ */ elseif ($endpoint === 'source-fetch') {
+
+  $entity = $_GET['entity'] ?? null;
+  $id = $_GET['id'] ?? null;
+
+  if (!$entity || !$id) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Missing entity or id']);
+    exit;
+  }
+
+  // Validate source entity
+  $allowed = false;
+  foreach ($env['entities'] as $e) {
+    if (($e['source_entity_name'] ?? null) === $entity) {
+      $allowed = true;
+      break;
+    }
+  }
+
+  if (!$allowed) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Source entity not allowed']);
+    exit;
+  }
+
+  $baseUrl = rtrim($env['source']['base_url'], '/');
+  $url = $baseUrl . '/' . rawurlencode($entity) . '/' . rawurlencode($id);
+
+  $client = new CurlClient(false);
+  $bodyStream = fopen('php://temp', 'w+');
+
+  $info = $client->get($url, [], $bodyStream);
+
+  if (!$info || ($info['http_code'] ?? 500) >= 400) {
+    http_response_code(502);
+    echo json_encode([
+      'error' => 'Failed to fetch source record',
+      'http_code' => $info['http_code'] ?? null
+    ], JSON_PRETTY_PRINT);
+    exit;
+  }
+
+  rewind($bodyStream);
+  $data = json_decode(stream_get_contents($bodyStream), true);
+  fclose($bodyStream);
+
+  echo json_encode([
+    'system' => 'source',
+    'entity' => $entity,
+    'id' => $id,
+    'data' => $data
+  ], JSON_PRETTY_PRINT);
+  exit;
+}
+
+/**
+ * -------------------------------------------------
  * TARGET FETCH (Airtable)
  * -------------------------------------------------
  */ elseif ($endpoint === 'target-fetch') {
