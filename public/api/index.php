@@ -132,7 +132,7 @@ if ($endpoint === 'configs-fetch') {
     exit;
   }
 
-  // Validate target entity
+  // Validate target entity via env.json
   $entityMap = null;
   foreach ($env['entities'] as $e) {
     if (($e['target_entity_name'] ?? null) === $entity) {
@@ -147,49 +147,60 @@ if ($endpoint === 'configs-fetch') {
     exit;
   }
 
-  $targetBaseUrl = rtrim($env['target']['base_url'], '/');
-  $targetBaseId = $env['target']['base_id'];
-  $targetTable = $entityMap['target_entity_name'];
+  // Build Airtable URL
+  $baseUrl = rtrim($env['target']['base_url'], '/');
+  $baseId = $env['target']['base_id'];
+  $table = $entityMap['target_entity_name'];
 
   $url =
-    $targetBaseUrl . '/' .
-    rawurlencode($targetBaseId) . '/' .
-    rawurlencode($targetTable) . '/' .
+    $baseUrl . '/' .
+    rawurlencode($baseId) . '/' .
+    rawurlencode($table) . '/' .
     rawurlencode($id);
 
-  // Host-based auth
+  // Inject auth headers (host-based)
   $host = parse_url($url, PHP_URL_HOST);
-
-  if (!isset($config[$host])) {
+  if (!isset($config[$host]['headers'])) {
     http_response_code(500);
-    echo json_encode(['error' => 'No auth config for host: ' . $host]);
+    echo json_encode(['error' => 'No auth config for host']);
     exit;
   }
 
-  $requestHeaders = [];
-  if (isset($config[$host]['headers'])) {
-    foreach ($config[$host]['headers'] as $k => $v) {
-      $requestHeaders[] = $k . ': ' . $v;
-    }
+  $headers = [];
+  foreach ($config[$host]['headers'] as $k => $v) {
+    $headers[] = $k . ': ' . $v;
   }
 
+  // Fetch
   $client = new CurlClient(false);
   $bodyStream = fopen('php://temp', 'w+');
 
-  $info = $client->get($url, $requestHeaders, $bodyStream);
+  $info = $client->get($url, $headers, $bodyStream);
+
+  rewind($bodyStream);
+  $raw = stream_get_contents($bodyStream);
+  fclose($bodyStream);
 
   if (!$info || ($info['http_code'] ?? 500) >= 400) {
     http_response_code(502);
     echo json_encode([
       'error' => 'Failed to fetch target record',
-      'http_code' => $info['http_code'] ?? null
+      'http_code' => $info['http_code'] ?? null,
+      'attempted_url' => $url
     ], JSON_PRETTY_PRINT);
     exit;
   }
 
-  rewind($bodyStream);
-  $data = json_decode(stream_get_contents($bodyStream), true);
-  fclose($bodyStream);
+  $data = json_decode($raw, true);
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    http_response_code(500);
+    echo json_encode([
+      'error' => 'JSON decode failed',
+      'json_error' => json_last_error_msg(),
+      'raw_body' => $raw
+    ], JSON_PRETTY_PRINT);
+    exit;
+  }
 
   echo json_encode([
     'system' => 'target',
@@ -199,6 +210,7 @@ if ($endpoint === 'configs-fetch') {
   ], JSON_PRETTY_PRINT);
   exit;
 }
+
 
 /**
  * -------------------------------------------------
