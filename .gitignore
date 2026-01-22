@@ -35,3 +35,4 @@ yarn-error.log*
 # .env.development
 # .env.production
 public/api/config.json
+public/api/env.json
