@@ -28,7 +28,8 @@ function resolvePath($data, $path)
     return null;
 
   // Split on dots, but keep bracket tokens
-  preg_match_all("/(\w+|\['[^']+'\]|\[x\])/", $path, $matches);
+  preg_match_all("/([A-Za-z0-9_-]+|\['[^']+'\]|\[x\])/", $path, $matches);
+
   $tokens = $matches[0];
 
   return walkTokens($data, $tokens);
