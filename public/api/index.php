@@ -4,6 +4,7 @@ ini_set('display_errors', true);
 error_reporting(E_ALL);
 
 require __DIR__ . '/CurlClient.php';
+require __DIR__ . '/helpers.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -108,13 +109,28 @@ if ($endpoint === 'configs-fetch') {
   $data = json_decode(stream_get_contents($bodyStream), true);
   fclose($bodyStream);
 
+  // Find entity mapping
+  $entityMap = null;
+  foreach ($env['entities'] as $e) {
+    if (($e['source_entity_name'] ?? null) === $entity) {
+      $entityMap = $e;
+      break;
+    }
+  }
+
+  $normData = $entityMap
+    ? normalizeStructure($data, $entityMap, 'source')
+    : [];
+
   echo json_encode([
     'system' => 'source',
     'entity' => $entity,
     'id' => $id,
-    'data' => $data
+    'norm_data' => $normData,
+    'raw_data' => $data
   ], JSON_PRETTY_PRINT);
   exit;
+
 }
 
 /**
@@ -202,13 +218,17 @@ if ($endpoint === 'configs-fetch') {
     exit;
   }
 
+  $normData = normalizeStructure($data, $entityMap, 'target');
+
   echo json_encode([
     'system' => 'target',
     'entity' => $entity,
     'id' => $id,
-    'data' => $data
+    'norm_data' => $normData,
+    'raw_data' => $data
   ], JSON_PRETTY_PRINT);
   exit;
+
 }
 
 
