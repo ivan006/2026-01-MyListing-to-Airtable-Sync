@@ -1,62 +1,32 @@
+# IRIS — Ivan’s Robust Integration System
 
-## Moderated Integration & Revision Service — Overview
+## Philosophy
 
-This project is an **approval-based integration system** between two separate portals:
+**IRIS is a relationship-first integration system.**
 
-* **Source (Contributor Portal):** WordPress using the *MyListing* theme
-* **Target (Source of Truth):** Airtable (customer-facing data)
+Most integrations sync records.
+Very few sync **relationships** — even though relationships are a **critical** part of any real integration.
 
-Contributors edit content in WordPress, but **nothing syncs automatically**. All data flows from WordPress → Airtable **only after moderator review and approval**.
-
----
-
-## Core Architecture (by priority)
-
-1. **Connector**
-   Handles safe, directional data movement between WordPress and Airtable.
-   Responsible for fetching records from each system and enforcing allowed access.
-
-2. **Prompt System (Admin UI)**
-   Provides a human-facing interface to:
-
-   * select source and target records
-   * review normalized data
-   * inspect differences
-   * approve or reject changes
-
-3. **External-ID Streamlining**
-   A usability and data-entry simplification layer.
-   Instead of requiring administrators to repeatedly specify matching record IDs across systems, this milestone:
-
-   * allows source and target records to be linked once
-   * stores the corresponding external ID on each system’s record
-   * removes the need to memorise or re-enter IDs in the UI
-
-   This does **not** introduce a central registry; it simply reduces friction by persisting known foreign/external IDs at the system level.
-
-4. **Revision & Relationship Sync Support (Optional)**
-   Builds on the earlier layers to enable:
-
-   * diff computation and optional diff persistence
-   * revision history
-   * **robust cross-system relational syncing**
-
-   This milestone introduces **Registered Entities (the Entity Registry)** as core infrastructure, providing:
-
-   * stable internal identities for real-world entities
-   * mapping between source and target external IDs
-   * translation of foreign keys between systems
-   * a foundation for revision tracking and relationship syncing
+IRIS exists to treat relationships as first-class concerns.
 
 ---
 
-## Initial Endpoints (Tasks)
+### What IRIS Does
 
-* `configs-fetch` — expose allowed entities and field mappings
-* `source-fetch` — fetch WordPress/MyListing records
-* `target-fetch` — fetch Airtable records
-* *(Later)* approved sync endpoints
+**Relationship Syncing (Primary)**
+IRIS syncs relationships by assigning entities a stable internal identity and translating foreign keys between systems at sync time, rather than leaking IDs across schemas.
+This allows each system to use its own native identifiers while relationships remain correct.
+
+**Revision Tracking (Secondary)**
+Because entities have stable identity, IRIS can diff changes, commit them, and maintain a revision history.
+This capability naturally emerges from the same foundation used for relationship syncing.
+
+**Intervention Mode (Optional)**
+IRIS can require **moderator approval** before changes are committed, enabling controlled, review-based integrations.
 
 ---
 
-**Key principle:** this system prioritizes **explicit approval and relational integrity** over automatic or freshness-based syncing.
+### Notes
+
+* IRIS also supports **image and media syncing** (adapter-specific where necessary)
+* The system is **target- and source-agnostic**, where practical
